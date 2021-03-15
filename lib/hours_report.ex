@@ -8,6 +8,12 @@ defmodule HoursReport do
     |> Enum.reduce(initial_report(), &sum_hours/2)
   end
 
+  def generate_report_parallel(file_names) do
+    file_names
+    |> Task.async_stream(&generate_report/1)
+    |> Enum.reduce(initial_report(), &merge_reports/2)
+  end
+
   defp sum_hours(line, report) do
     report
     |> sum_all_hours(line)
@@ -70,6 +76,27 @@ defmodule HoursReport do
     sum_year_hours = hours + Map.get(hours_per_year_of_user, year, 0)
 
     Map.put(hours_per_year_of_user, year, sum_year_hours)
+  end
+
+  defp merge_reports(
+         {:ok, report_one},
+         report_two
+       ) do
+    merge_map(report_one, report_two)
+  end
+
+  defp merge_map(map_one, map_two) when is_map(map_one) and is_map(map_two) do
+    Map.merge(map_one, map_two, &merge_map_values/3)
+  end
+
+  defp merge_map_values(_key, value_one, value_two)
+       when is_integer(value_one) and is_integer(value_two) do
+    value_one + value_two
+  end
+
+  defp merge_map_values(_key, value_one, value_two)
+       when is_map(value_one) and is_map(value_two) do
+    merge_map(value_one, value_two)
   end
 
   defp build_report(all_hours, hours_per_month, hours_per_year) do
